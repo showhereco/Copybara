@@ -383,7 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     case .notFound:
       return "Launch at login unavailable"
     @unknown default:
-      return "Launch at login unavailable"
+      return "Launch at login not enabled"
     }
   }
 
