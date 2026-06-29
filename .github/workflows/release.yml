@@ -2,14 +2,11 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+    paths:
+      - VERSION
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to publish, without the leading v"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -36,18 +33,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-            tag="${GITHUB_REF_NAME}"
-          else
-            version="${{ inputs.version }}"
-            tag="v${version}"
-          fi
+          version="$(tr -d '[:space:]' < VERSION)"
 
           if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){1,2}([.-][0-9A-Za-z]+)?$ ]]; then
-            echo "Invalid version: $version" >&2
+            echo "Invalid VERSION file value: $version" >&2
             exit 1
           fi
+
+          tag="v${version}"
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -255,7 +248,14 @@ jobs:
 
           git fetch --tags origin
 
-          if ! git rev-parse "$tag" >/dev/null 2>&1; then
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            tagged_sha="$(git rev-list -n 1 "$tag")"
+            if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $tag already exists at $tagged_sha, but this workflow is running at $GITHUB_SHA." >&2
+              echo "Run the workflow with --ref $tag to republish that release, or delete/recreate the tag intentionally." >&2
+              exit 1
+            fi
+          else
             git tag "$tag" "$GITHUB_SHA"
             git push origin "$tag"
           fi
