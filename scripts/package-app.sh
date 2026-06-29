@@ -117,6 +117,12 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
       <string>copyLinkWithCopybara</string>
       <key>NSPortName</key>
       <string>$APP_NAME</string>
+      <key>NSSendTypes</key>
+      <array>
+        <string>NSFilenamesPboardType</string>
+        <string>NSURLPboardType</string>
+        <string>public.file-url</string>
+      </array>
       <key>NSSendFileTypes</key>
       <array>
         <string>public.item</string>
