@@ -38,7 +38,7 @@ SWIFT_BUILD_ARCHS="$(uname -m)" ./scripts/package-app.sh
 - `LSUIElement` menu bar app.
 - App identifier: `co.showhere.copybara`.
 - `NSStatusItem.button` hosts a `DropTargetView` overlay for file and text drops.
-- Dropping a Dropbox file copies a local URL, defaulting to `copybara:///relative/path`.
+- Dropping a Dropbox file copies a local URL, defaulting to `copybara://relative/path`.
 - The Finder service adds **Copy Link with Copybara** for Dropbox items.
 - The app opens `copybara:` links in Finder or the default app.
 - `dropifier:` links are supported for backward compatibility.

@@ -30,7 +30,7 @@ enum LinkCodec {
       }
       .joined(separator: "/")
 
-    return "\(scheme):///\(encodedPath)"
+    return "\(scheme)://\(encodedPath)"
   }
 
   static func decodeRelativePath(from url: URL) -> String? {

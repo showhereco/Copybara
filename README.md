@@ -5,7 +5,7 @@ Copybara is a small macOS menu bar app for sharing Dropbox files as local links.
 Drag a file from your Dropbox folder onto the Copybara menu bar icon, or use the Finder service, and Copybara copies a link like:
 
 ```text
-copybara:///WORK/ACME/Deck-final v2 (DO NOT USE) copy.pdf
+copybara://WORK/ACME/deck-final-v2-do-not-use-copy.pdf
 ```
 
 Opening that link on another Mac with Copybara installed opens the matching local Dropbox file, without sending the file through a public share URL.
