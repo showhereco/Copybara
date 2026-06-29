@@ -1,6 +1,6 @@
 # Development
 
-Copybara is a native macOS menu bar app built with Swift and AppKit. It has no package dependencies.
+Copybara is a native macOS menu bar app built with Swift and AppKit. It uses Sparkle for automatic updates.
 
 ## Requirements
 
@@ -32,6 +32,14 @@ Packaged builds are universal by default. For a faster native-only local build, 
 ```sh
 SWIFT_BUILD_ARCHS="$(uname -m)" ./scripts/package-app.sh
 ```
+
+## Release
+
+The release version is tracked in `VERSION`. To publish a new release, update `VERSION`, commit the change, and push it to `main`.
+
+The release workflow reads `VERSION`, builds and verifies the signed/notarized macOS DMG, signs that DMG for Sparkle, generates `appcast.xml`, then publishes the GitHub Release for that version.
+
+Sparkle updates use the same GitHub Release DMG. To republish a deleted release for the current `VERSION`, run the release workflow manually from GitHub Actions.
 
 ## Implementation Notes
 

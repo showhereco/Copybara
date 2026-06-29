@@ -38,18 +38,6 @@ You can also right-click a Dropbox item in Finder and choose **Copy Link with Co
 
 See [Using Copybara](docs/usage.md) for menu options, link behavior, and troubleshooting.
 
-## Release
-
-The release version is tracked in `VERSION`. To publish a new release, update `VERSION`, commit the change, and push it to `main`.
-
-The release workflow reads `VERSION`, builds and verifies the signed/notarized macOS DMG, then publishes the GitHub Release for that version.
-
-To republish a deleted release for the current `VERSION`, run the release workflow manually from GitHub Actions.
-
-## TODO
-
-- Add Sparkle-based automatic updates.
-
 ## Links
 
 - [Using Copybara](docs/usage.md)

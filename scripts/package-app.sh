@@ -8,6 +8,7 @@ APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")}"
 APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-1}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 SIGN_KEYCHAIN="${SIGN_KEYCHAIN:-}"
+SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 SWIFT_BUILD_ARCHS="${SWIFT_BUILD_ARCHS:-arm64 x86_64}"
 ORIGINAL_HOME="${HOME:-}"
 BUILD_DIR="$ROOT_DIR/.build"
@@ -21,6 +22,7 @@ APP_DIR="$BUILD_DIR/release/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
 
 CURRENT_CACHE_CONTEXT="ROOT_DIR=$ROOT_DIR
 MODULE_CACHE=$MODULE_CACHE
@@ -53,26 +55,78 @@ swift build \
   -c release \
   "${ARCH_ARGS[@]}" \
   -Xswiftc -module-cache-path \
-  -Xswiftc "$MODULE_CACHE" >&2
+  -Xswiftc "$MODULE_CACHE" \
+  -Xlinker -rpath \
+  -Xlinker @executable_path/../Frameworks >&2
 
 if [[ -n "$ORIGINAL_HOME" ]]; then
   export HOME="$ORIGINAL_HOME"
 fi
 
-BUILT_EXECUTABLE="$BUILD_DIR/apple/Products/Release/$APP_NAME"
-if [[ ! -f "$BUILT_EXECUTABLE" ]]; then
-  BUILT_EXECUTABLE="$BUILD_DIR/release/$APP_NAME"
-fi
+ARCH_COUNT=0
+for _ in $SWIFT_BUILD_ARCHS; do
+  ARCH_COUNT=$((ARCH_COUNT + 1))
+done
 
-if [[ ! -f "$BUILT_EXECUTABLE" ]]; then
+BUILT_EXECUTABLE=""
+EXECUTABLE_CANDIDATES=()
+if [[ "$ARCH_COUNT" -gt 1 ]]; then
+  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/$APP_NAME")
+fi
+for arch in $SWIFT_BUILD_ARCHS; do
+  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/$arch-apple-macosx/release/$APP_NAME")
+done
+if [[ "$ARCH_COUNT" -le 1 ]]; then
+  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/$APP_NAME")
+fi
+EXECUTABLE_CANDIDATES+=("$BUILD_DIR/release/$APP_NAME")
+
+for candidate in "${EXECUTABLE_CANDIDATES[@]}"; do
+  if [[ -f "$candidate" ]]; then
+    BUILT_EXECUTABLE="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$BUILT_EXECUTABLE" ]]; then
   echo "Built executable not found." >&2
   exit 1
 fi
 
 rm -rf "$APP_DIR"
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 cp "$BUILT_EXECUTABLE" "$MACOS_DIR/$APP_NAME"
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+
+SPARKLE_FRAMEWORK=""
+FRAMEWORK_CANDIDATES=()
+if [[ "$ARCH_COUNT" -gt 1 ]]; then
+  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/Sparkle.framework")
+fi
+for arch in $SWIFT_BUILD_ARCHS; do
+  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/$arch-apple-macosx/release/Sparkle.framework")
+done
+if [[ "$ARCH_COUNT" -le 1 ]]; then
+  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/Sparkle.framework")
+fi
+
+for candidate in "${FRAMEWORK_CANDIDATES[@]}"; do
+  if [[ -d "$candidate" ]]; then
+    SPARKLE_FRAMEWORK="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$SPARKLE_FRAMEWORK" ]]; then
+  SPARKLE_FRAMEWORK="$(find "$BUILD_DIR/artifacts" -path "*/Sparkle.framework" -type d | sort | head -n 1)"
+fi
+
+if [[ -z "$SPARKLE_FRAMEWORK" ]]; then
+  echo "Sparkle.framework not found in SwiftPM build artifacts." >&2
+  exit 1
+fi
+
+ditto "$SPARKLE_FRAMEWORK" "$FRAMEWORKS_DIR/Sparkle.framework"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -105,6 +159,10 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>15.0</string>
   <key>LSUIElement</key>
   <true/>
+  <key>SUFeedURL</key>
+  <string>https://github.com/showhereco/Copybara/releases/latest/download/appcast.xml</string>
+  <key>SUVerifyUpdateBeforeExtraction</key>
+  <true/>
   <key>NSServices</key>
   <array>
     <dict>
@@ -131,6 +189,11 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   </array>
   <key>NSHumanReadableCopyright</key>
   <string>Copyright © 2026</string>
+$(if [[ -n "$SPARKLE_PUBLIC_ED_KEY" ]]; then cat <<KEY
+  <key>SUPublicEDKey</key>
+  <string>$SPARKLE_PUBLIC_ED_KEY</string>
+KEY
+fi)
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
@@ -155,8 +218,10 @@ if [[ -n "$SIGN_KEYCHAIN" ]]; then
 fi
 
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
+  codesign "${CODESIGN_ARGS[@]}" --deep --sign - "$FRAMEWORKS_DIR/Sparkle.framework" >&2
   codesign "${CODESIGN_ARGS[@]}" --sign - "$APP_DIR" >&2
 else
+  codesign "${CODESIGN_ARGS[@]}" --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework" >&2
   codesign "${CODESIGN_ARGS[@]}" --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_DIR" >&2
 fi
 

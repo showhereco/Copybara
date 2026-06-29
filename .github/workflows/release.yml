@@ -45,6 +45,24 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Sparkle configuration
+        shell: bash
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SPARKLE_PUBLIC_ED_KEY}" ]]; then
+            echo "Repository variable SPARKLE_PUBLIC_ED_KEY is required for Sparkle updates." >&2
+            exit 1
+          fi
+
+          if [[ -z "${SPARKLE_PRIVATE_ED_KEY}" ]]; then
+            echo "Repository secret SPARKLE_PRIVATE_ED_KEY is required to sign Sparkle update archives." >&2
+            exit 1
+          fi
+
       - name: Import Developer ID certificate
         shell: bash
         env:
@@ -101,18 +119,31 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.version }}
           APP_BUILD_NUMBER: ${{ github.run_number }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
         run: |
           set -euo pipefail
           ./scripts/package-app.sh
 
       - name: Verify app bundle
         shell: bash
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
         run: |
           set -euo pipefail
           plutil -lint .build/release/Copybara.app/Contents/Info.plist
           bundle_id="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" .build/release/Copybara.app/Contents/Info.plist)"
           if [[ "$bundle_id" != "co.showhere.copybara" ]]; then
             echo "Expected bundle identifier co.showhere.copybara, got: $bundle_id" >&2
+            exit 1
+          fi
+          feed_url="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" .build/release/Copybara.app/Contents/Info.plist)"
+          if [[ "$feed_url" != "https://github.com/showhereco/Copybara/releases/latest/download/appcast.xml" ]]; then
+            echo "Unexpected Sparkle feed URL: $feed_url" >&2
+            exit 1
+          fi
+          public_ed_key="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" .build/release/Copybara.app/Contents/Info.plist)"
+          if [[ "$public_ed_key" != "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+            echo "Sparkle public EdDSA key in Info.plist does not match repository variable." >&2
             exit 1
           fi
           archs="$(lipo -archs .build/release/Copybara.app/Contents/MacOS/Copybara)"
@@ -237,6 +268,16 @@ jobs:
           echo "archive_path=${{ steps.dmg.outputs.dmg_path }}" >> "$GITHUB_OUTPUT"
           echo "checksum_path=${{ steps.dmg.outputs.dmg_path }}.sha256" >> "$GITHUB_OUTPUT"
 
+      - name: Generate Sparkle appcast
+        id: appcast
+        shell: bash
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          appcast_path="$(./scripts/generate-appcast.sh "${{ steps.dmg.outputs.dmg_path }}" "${{ steps.version.outputs.version }}" "${{ github.run_number }}" ".build/artifacts")"
+          echo "appcast_path=$appcast_path" >> "$GITHUB_OUTPUT"
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
@@ -244,6 +285,7 @@ jobs:
           path: |
             ${{ steps.archive.outputs.archive_path }}
             ${{ steps.archive.outputs.checksum_path }}
+            ${{ steps.appcast.outputs.appcast_path }}
 
       - name: Publish GitHub Release
         shell: bash
@@ -272,5 +314,6 @@ jobs:
           gh release create "$tag" \
             "${{ steps.archive.outputs.archive_path }}" \
             "${{ steps.archive.outputs.checksum_path }}" \
+            "${{ steps.appcast.outputs.appcast_path }}" \
             --title "Copybara $version" \
-            --notes "Signed and notarized macOS DMG for Copybara $version."
+            --notes "Signed and notarized macOS DMG for Copybara $version. Sparkle appcast included for automatic updates."

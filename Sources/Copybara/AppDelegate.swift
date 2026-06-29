@@ -1,10 +1,16 @@
 import AppKit
 import ServiceManagement
+import Sparkle
 import UniformTypeIdentifiers
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private let preferences = Preferences()
+  private let updaterController = SPUStandardUpdaterController(
+    startingUpdater: true,
+    updaterDelegate: nil,
+    userDriverDelegate: nil
+  )
   private var statusItem: NSStatusItem?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -154,6 +160,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     menu.addItem(.separator())
+
+    let updateItem = menuItem(
+      "Check for Updates...",
+      action: #selector(checkForUpdates),
+      icon: "arrow.down.circle"
+    )
+    updateItem.isEnabled = updaterController.updater.canCheckForUpdates
+    menu.addItem(updateItem)
+
     menu.addItem(menuItem("Quit", action: #selector(quit), icon: "xmark", keyEquivalent: "q"))
 
     for item in menu.items where item.action != nil {
@@ -214,6 +229,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private func sizedMenuIcon(_ image: NSImage) -> NSImage {
     image.size = NSSize(width: 16, height: 16)
     return image
+  }
+
+  @objc private func checkForUpdates() {
+    updaterController.checkForUpdates(nil)
   }
 
   private func handleDroppedText(_ text: String) {
