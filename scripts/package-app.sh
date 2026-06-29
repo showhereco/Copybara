@@ -9,6 +9,7 @@ APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-1}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 SIGN_KEYCHAIN="${SIGN_KEYCHAIN:-}"
 SWIFT_BUILD_ARCHS="${SWIFT_BUILD_ARCHS:-arm64 x86_64}"
+ORIGINAL_HOME="${HOME:-}"
 BUILD_DIR="$ROOT_DIR/.build"
 MODULE_CACHE="$BUILD_DIR/module-cache"
 CACHE_CONTEXT="$BUILD_DIR/package-cache-context"
@@ -53,6 +54,10 @@ swift build \
   "${ARCH_ARGS[@]}" \
   -Xswiftc -module-cache-path \
   -Xswiftc "$MODULE_CACHE" >&2
+
+if [[ -n "$ORIGINAL_HOME" ]]; then
+  export HOME="$ORIGINAL_HOME"
+fi
 
 BUILT_EXECUTABLE="$BUILD_DIR/apple/Products/Release/$APP_NAME"
 if [[ ! -f "$BUILT_EXECUTABLE" ]]; then
