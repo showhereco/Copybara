@@ -16,6 +16,8 @@ permissions:
 
 env:
   CODESIGN_IDENTITY: "Developer ID Application: Showhere Limited (Z7BAN29RTJ)"
+  APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
+  APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
 
 jobs:
   release:
@@ -122,8 +124,6 @@ jobs:
         shell: bash
         env:
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
 
@@ -133,7 +133,7 @@ jobs:
           fi
 
           if [[ -z "${APP_STORE_CONNECT_API_KEY_BASE64}" || -z "${APP_STORE_CONNECT_KEY_ID}" || -z "${APP_STORE_CONNECT_ISSUER_ID}" ]]; then
-            echo "App Store Connect API key secrets are required for Developer ID notarization." >&2
+            echo "App Store Connect API key secret and variables are required for Developer ID notarization." >&2
             exit 1
           fi
 
@@ -144,9 +144,6 @@ jobs:
 
       - name: Notarize app
         shell: bash
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
 
@@ -199,9 +196,6 @@ jobs:
 
       - name: Notarize DMG
         shell: bash
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
 

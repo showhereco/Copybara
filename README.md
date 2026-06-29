@@ -38,8 +38,11 @@ You can also right-click a Dropbox item in Finder and choose **Copy Link with Co
 
 See [Using Copybara](docs/usage.md) for menu options, link behavior, and troubleshooting.
 
+## TODO
+
+- Add Sparkle-based automatic updates.
+
 ## Links
 
 - [Using Copybara](docs/usage.md)
 - [Development](docs/development.md)
-- [Release Process](docs/release.md)
