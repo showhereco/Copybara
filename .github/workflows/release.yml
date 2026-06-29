@@ -73,19 +73,27 @@ jobs:
           security list-keychains -d user -s "$keychain_path"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
 
+          identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          echo "$identities"
+
           if [[ -n "$REQUESTED_SIGN_IDENTITY" ]]; then
-            identity="$REQUESTED_SIGN_IDENTITY"
+            identity_hash="$(printf '%s\n' "$identities" | awk -F'"' -v requested="$REQUESTED_SIGN_IDENTITY" '$2 == requested { print $1; exit }' | awk '{ print $2 }')"
+            identity_name="$REQUESTED_SIGN_IDENTITY"
           else
-            identity="$(security find-identity -v -p codesigning "$keychain_path" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+            identity_hash="$(printf '%s\n' "$identities" | awk -F'"' '/Developer ID Application/ { print $1; exit }' | awk '{ print $2 }')"
+            identity_name="$(printf '%s\n' "$identities" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
           fi
 
-          if [[ -z "$identity" ]]; then
-            echo "Developer ID Application identity not found in certificate." >&2
+          if [[ -z "$identity_hash" ]]; then
+            echo "Developer ID Application identity not found in imported certificate." >&2
+            if [[ -n "$REQUESTED_SIGN_IDENTITY" ]]; then
+              echo "Requested identity: $REQUESTED_SIGN_IDENTITY" >&2
+            fi
             exit 1
           fi
 
-          echo "Using signing identity: $identity"
-          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "Using signing identity: $identity_name ($identity_hash)"
+          echo "SIGN_IDENTITY=$identity_hash" >> "$GITHUB_ENV"
 
       - name: Build app bundle
         shell: bash
