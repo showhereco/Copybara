@@ -1,6 +1,7 @@
 import AppKit
 import ServiceManagement
 import Sparkle
+import Symbols
 import UniformTypeIdentifiers
 
 @MainActor
@@ -12,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     userDriverDelegate: nil
   )
   private var statusItem: NSStatusItem?
+  private weak var statusIconView: NSImageView?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
@@ -40,14 +42,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let icon = NSImage(
       systemSymbolName: "link",
       accessibilityDescription: Constants.appName
-    )?.withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
+    )?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
     icon?.isTemplate = true
 
-    button.image = icon
-    button.imagePosition = .imageOnly
-    button.imageScaling = .scaleProportionallyDown
+    let statusIconView = NSImageView(frame: button.bounds)
+    statusIconView.image = icon
+    statusIconView.imageAlignment = .alignCenter
+    statusIconView.imageScaling = .scaleProportionallyDown
+    statusIconView.autoresizingMask = [.width, .height]
+    statusIconView.setAccessibilityElement(false)
+
+    button.image = nil
     button.toolTip = Constants.appName
     button.setAccessibilityElement(false)
+    button.addSubview(statusIconView)
+    self.statusIconView = statusIconView
 
     let dropTargetView = DropTargetView(frame: button.bounds)
     dropTargetView.autoresizingMask = [.width, .height]
@@ -56,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       guard let fileURL = urls.first else {
         return
       }
+      self?.statusIconView?.addSymbolEffect(.rotate, options: .default, animated: true)
       _ = self?.copyLink(forFileURL: fileURL)
     }
     dropTargetView.onTextDrop = { [weak self] text in
@@ -103,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     menu.addItem(.separator())
 
-    let schemeItem = menuItem("Copied URL scheme", icon: "link")
+    let schemeItem = menuItem("URL scheme", icon: "link")
     let schemeMenu = NSMenu()
     for scheme in Constants.supportedURLSchemes {
       let item = menuItem(
