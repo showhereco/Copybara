@@ -1,0 +1,273 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, without the leading v"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CODESIGN_IDENTITY: "Developer ID Application: Showhere Limited (Z7BAN29RTJ)"
+
+jobs:
+  release:
+    name: Build and publish macOS DMG
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            tag="${GITHUB_REF_NAME}"
+          else
+            version="${{ inputs.version }}"
+            tag="v${version}"
+          fi
+
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){1,2}([.-][0-9A-Za-z]+)?$ ]]; then
+            echo "Invalid version: $version" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Import Developer ID certificate
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.DEVELOPER_ID_KEYCHAIN_PASSWORD }}
+          REQUESTED_SIGN_IDENTITY: ${{ env.CODESIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CERTIFICATE_BASE64}" ]]; then
+            echo "No Developer ID certificate configured; using ad-hoc signing."
+            echo "SIGN_IDENTITY=-" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          keychain_password="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/release-signing.keychain-db"
+
+          base64 --decode <<< "$CERTIFICATE_BASE64" > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
+
+          if [[ -n "$REQUESTED_SIGN_IDENTITY" ]]; then
+            identity="$REQUESTED_SIGN_IDENTITY"
+          else
+            identity="$(security find-identity -v -p codesigning "$keychain_path" | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          fi
+
+          if [[ -z "$identity" ]]; then
+            echo "Developer ID Application identity not found in certificate." >&2
+            exit 1
+          fi
+
+          echo "Using signing identity: $identity"
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          APP_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          ./scripts/package-app.sh
+
+      - name: Verify app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          plutil -lint .build/release/Copybara.app/Contents/Info.plist
+          bundle_id="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" .build/release/Copybara.app/Contents/Info.plist)"
+          if [[ "$bundle_id" != "co.showhere.copybara" ]]; then
+            echo "Expected bundle identifier co.showhere.copybara, got: $bundle_id" >&2
+            exit 1
+          fi
+          archs="$(lipo -archs .build/release/Copybara.app/Contents/MacOS/Copybara)"
+          if [[ " $archs " != *" x86_64 "* || " $archs " != *" arm64 "* ]]; then
+            echo "Expected universal binary with x86_64 and arm64, got: $archs" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 .build/release/Copybara.app
+
+      - name: Prepare notarization credentials
+        shell: bash
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping notarization credential setup for ad-hoc signed build."
+            exit 0
+          fi
+
+          if [[ -z "${APP_STORE_CONNECT_API_KEY_BASE64}" || -z "${APP_STORE_CONNECT_KEY_ID}" || -z "${APP_STORE_CONNECT_ISSUER_ID}" ]]; then
+            echo "App Store Connect API key secrets are required for Developer ID notarization." >&2
+            exit 1
+          fi
+
+          notary_key_path="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          base64 --decode <<< "$APP_STORE_CONNECT_API_KEY_BASE64" > "$notary_key_path"
+          chmod 600 "$notary_key_path"
+          echo "NOTARY_KEY_PATH=$notary_key_path" >> "$GITHUB_ENV"
+
+      - name: Notarize app
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping notarization for ad-hoc signed build."
+            exit 0
+          fi
+
+          ditto -c -k --keepParent .build/release/Copybara.app "$RUNNER_TEMP/Copybara-notary.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Copybara-notary.zip" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          xcrun stapler staple .build/release/Copybara.app
+
+      - name: Assess stapled app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping Gatekeeper assessment for ad-hoc signed build."
+            exit 0
+          fi
+
+          spctl --assess --type execute --verbose=4 .build/release/Copybara.app
+
+      - name: Package DMG
+        id: dmg
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg_path="$(./scripts/package-dmg.sh ".build/release/Copybara.app" "${{ steps.version.outputs.version }}" ".build/artifacts")"
+          echo "dmg_path=$dmg_path" >> "$GITHUB_OUTPUT"
+
+      - name: Verify DMG signature
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          hdiutil verify "${{ steps.dmg.outputs.dmg_path }}"
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping DMG signature verification for unsigned ad-hoc build."
+            exit 0
+          fi
+
+          codesign --verify --verbose=2 "${{ steps.dmg.outputs.dmg_path }}"
+
+      - name: Notarize DMG
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping DMG notarization for ad-hoc signed build."
+            exit 0
+          fi
+
+          xcrun notarytool submit "${{ steps.dmg.outputs.dmg_path }}" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "${{ steps.dmg.outputs.dmg_path }}"
+
+      - name: Assess stapled DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          hdiutil verify "${{ steps.dmg.outputs.dmg_path }}"
+
+          if [[ "$SIGN_IDENTITY" == "-" ]]; then
+            echo "Skipping Gatekeeper assessment for ad-hoc signed DMG."
+            exit 0
+          fi
+
+          codesign --verify --verbose=2 "${{ steps.dmg.outputs.dmg_path }}"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "${{ steps.dmg.outputs.dmg_path }}"
+
+      - name: Checksum release asset
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          shasum -a 256 "${{ steps.dmg.outputs.dmg_path }}" > "${{ steps.dmg.outputs.dmg_path }}.sha256"
+          echo "archive_path=${{ steps.dmg.outputs.dmg_path }}" >> "$GITHUB_OUTPUT"
+          echo "checksum_path=${{ steps.dmg.outputs.dmg_path }}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Copybara-${{ steps.version.outputs.version }}-macos
+          path: |
+            ${{ steps.archive.outputs.archive_path }}
+            ${{ steps.archive.outputs.checksum_path }}
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
+
+          git fetch --tags origin
+
+          if ! git rev-parse "$tag" >/dev/null 2>&1; then
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "$tag"
+          fi
+
+          gh release create "$tag" \
+            "${{ steps.archive.outputs.archive_path }}" \
+            "${{ steps.archive.outputs.checksum_path }}" \
+            --title "Copybara $version" \
+            --notes "Signed and notarized macOS DMG for Copybara $version."
