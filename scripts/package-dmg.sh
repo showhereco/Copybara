@@ -10,6 +10,7 @@ APP_PATH="$1"
 VERSION="$2"
 OUTPUT_DIR="$3"
 SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+SIGN_KEYCHAIN="${SIGN_KEYCHAIN:-}"
 APP_NAME="$(basename "$APP_PATH" .app)"
 DMG_NAME="$APP_NAME-$VERSION-macos.dmg"
 DMG_PATH="$OUTPUT_DIR/$DMG_NAME"
@@ -37,7 +38,11 @@ hdiutil create \
 rm -rf "$STAGING_DIR"
 
 if [[ -n "$SIGN_IDENTITY" && "$SIGN_IDENTITY" != "-" ]]; then
-  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH" >&2
+  CODESIGN_ARGS=(--force --timestamp)
+  if [[ -n "$SIGN_KEYCHAIN" ]]; then
+    CODESIGN_ARGS+=(--keychain "$SIGN_KEYCHAIN")
+  fi
+  codesign "${CODESIGN_ARGS[@]}" --sign "$SIGN_IDENTITY" "$DMG_PATH" >&2
 fi
 
 hdiutil verify "$DMG_PATH" >&2

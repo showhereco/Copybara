@@ -94,6 +94,7 @@ jobs:
 
           echo "Using signing identity: $identity_name ($identity_hash)"
           echo "SIGN_IDENTITY=$identity_hash" >> "$GITHUB_ENV"
+          echo "SIGN_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
 
       - name: Build app bundle
         shell: bash

@@ -7,6 +7,7 @@ BUNDLE_ID="co.showhere.copybara"
 APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")}"
 APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-1}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+SIGN_KEYCHAIN="${SIGN_KEYCHAIN:-}"
 SWIFT_BUILD_ARCHS="${SWIFT_BUILD_ARCHS:-arm64 x86_64}"
 BUILD_DIR="$ROOT_DIR/.build"
 MODULE_CACHE="$BUILD_DIR/module-cache"
@@ -137,10 +138,15 @@ PLIST
 
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 
+CODESIGN_ARGS=(--force)
+if [[ -n "$SIGN_KEYCHAIN" ]]; then
+  CODESIGN_ARGS+=(--keychain "$SIGN_KEYCHAIN")
+fi
+
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
-  codesign --force --sign - "$APP_DIR" >&2
+  codesign "${CODESIGN_ARGS[@]}" --sign - "$APP_DIR" >&2
 else
-  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_DIR" >&2
+  codesign "${CODESIGN_ARGS[@]}" --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_DIR" >&2
 fi
 
 echo "$APP_DIR"
