@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let icon = NSImage(
       systemSymbolName: "link",
       accessibilityDescription: Constants.appName
-    )?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+    )?.withSymbolConfiguration(.init(pointSize: 12, weight: .bold))
     icon?.isTemplate = true
 
     let statusIconView = NSImageView(frame: button.bounds)
