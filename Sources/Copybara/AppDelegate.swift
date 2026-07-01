@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func configureStatusItem() {
-    let item = NSStatusBar.system.statusItem(withLength: 18)
+    let item = NSStatusBar.system.statusItem(withLength: 16)
     guard let button = item.button else {
       return
     }
