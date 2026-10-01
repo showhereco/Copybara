@@ -25,6 +25,8 @@ Open a `copybara:` link from any app that recognizes clickable links. Copybara l
 
 If **Open enclosing folder only** is enabled in the Copybara menu, links reveal the item in Finder instead of opening the file directly.
 
+If the linked item is missing from your Mac, Copybara shows **This item isn’t available on this Mac** with its Dropbox-relative path. The item may be excluded from sync, moved, or deleted. Use **Copy folder path** to copy the enclosing folder’s local path, or enable the folder in Dropbox Preferences → Sync and click **Retry**. **Cancel** dismisses the popup. This also applies to legacy `dropifier:` links, and the popup appears even when notifications are disabled.
+
 ## Dropbox Web Links
 
 You can drag a Dropbox web link onto the Copybara menu bar icon. Copybara searches your configured Dropbox folder for a local file with the same name and opens the first match.

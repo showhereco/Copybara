@@ -294,14 +294,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       return
     }
 
-    guard let relativePath = LinkCodec.decodeRelativePath(from: url),
-      let destination = LinkCodec.containedURL(relativePath: relativePath, rootURL: root)
-    else {
+    guard let relativePath = LinkCodec.decodeRelativePath(from: url) else {
       notify(title: "Invalid Copybara link", body: url.absoluteString)
       return
     }
 
-    openOrReveal(destination)
+    while true {
+      guard let destination = LinkCodec.containedURL(relativePath: relativePath, rootURL: root)
+      else {
+        notify(title: "Invalid Copybara link", body: url.absoluteString)
+        return
+      }
+
+      if FileManager.default.fileExists(atPath: destination.path) {
+        openOrReveal(destination)
+        return
+      }
+
+      let alert = NSAlert()
+      alert.alertStyle = .warning
+      alert.messageText = "This item isn’t available on this Mac"
+      alert.informativeText = """
+        It may be excluded from Dropbox sync, moved, or deleted.
+
+        \(relativePath)
+
+        If it isn’t synced, select the folder in Dropbox Preferences → Sync, then click Retry.
+        """
+      alert.addButton(withTitle: "Retry")
+      alert.addButton(withTitle: "Copy folder path")
+      alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1b}"
+
+      NSApp.activate(ignoringOtherApps: true)
+
+      switch alert.runModal() {
+      case .alertFirstButtonReturn:
+        continue
+      case .alertSecondButtonReturn:
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(destination.deletingLastPathComponent().path, forType: .string)
+      default:
+        return
+      }
+    }
   }
 
   private func openOrReveal(_ url: URL) {
