@@ -3,11 +3,19 @@ import AppKit
 final class DropTargetView: NSView {
   var onFileDrop: (([URL]) -> Void)?
   var onTextDrop: ((String) -> Void)?
-  var onMenuRequested: (() -> Void)?
+  var onPress: (() -> Void)?
+  var onSecondaryPress: (() -> Void)?
+  var preferredSize: NSSize? {
+    didSet { invalidateIntrinsicContentSize() }
+  }
 
   private var isHighlighted = false {
     didSet { needsDisplay = true }
   }
+  private var showsCopyFeedback = false {
+    didSet { needsDisplay = true }
+  }
+  private var feedbackTask: Task<Void, Never>?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -23,26 +31,50 @@ final class DropTargetView: NSView {
     true
   }
 
+  override var intrinsicContentSize: NSSize {
+    preferredSize ?? super.intrinsicContentSize
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    super.hitTest(point) == nil ? nil : self
+  }
+
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
 
-    if isHighlighted {
+    if isHighlighted || showsCopyFeedback {
       NSColor.selectedControlColor.withAlphaComponent(0.22).setFill()
       NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 2), xRadius: 4, yRadius: 4).fill()
     }
   }
 
   override func mouseDown(with event: NSEvent) {
-    onMenuRequested?()
+    onPress?()
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    onMenuRequested?()
+    (onSecondaryPress ?? onPress)?()
   }
 
   override func accessibilityPerformPress() -> Bool {
-    onMenuRequested?()
+    guard let onPress else {
+      return false
+    }
+    onPress()
     return true
+  }
+
+  func flash() {
+    feedbackTask?.cancel()
+    showsCopyFeedback = true
+    feedbackTask = Task { @MainActor [weak self] in
+      do {
+        try await Task.sleep(nanoseconds: 140_000_000)
+      } catch {
+        return
+      }
+      self?.showsCopyFeedback = false
+    }
   }
 
   override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

@@ -59,37 +59,25 @@ swift build \
   -Xlinker -rpath \
   -Xlinker @executable_path/../Frameworks >&2
 
+BUILT_PRODUCTS_DIR="$(swift build \
+  --package-path "$ROOT_DIR" \
+  --scratch-path "$BUILD_DIR" \
+  --cache-path "$SWIFTPM_CACHE" \
+  --config-path "$SWIFTPM_CONFIG" \
+  --security-path "$SWIFTPM_SECURITY" \
+  --manifest-cache local \
+  --disable-sandbox \
+  -c release \
+  "${ARCH_ARGS[@]}" \
+  --show-bin-path)"
+
 if [[ -n "$ORIGINAL_HOME" ]]; then
   export HOME="$ORIGINAL_HOME"
 fi
 
-ARCH_COUNT=0
-for _ in $SWIFT_BUILD_ARCHS; do
-  ARCH_COUNT=$((ARCH_COUNT + 1))
-done
-
-BUILT_EXECUTABLE=""
-EXECUTABLE_CANDIDATES=()
-if [[ "$ARCH_COUNT" -gt 1 ]]; then
-  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/$APP_NAME")
-fi
-for arch in $SWIFT_BUILD_ARCHS; do
-  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/$arch-apple-macosx/release/$APP_NAME")
-done
-if [[ "$ARCH_COUNT" -le 1 ]]; then
-  EXECUTABLE_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/$APP_NAME")
-fi
-EXECUTABLE_CANDIDATES+=("$BUILD_DIR/release/$APP_NAME")
-
-for candidate in "${EXECUTABLE_CANDIDATES[@]}"; do
-  if [[ -f "$candidate" ]]; then
-    BUILT_EXECUTABLE="$candidate"
-    break
-  fi
-done
-
-if [[ -z "$BUILT_EXECUTABLE" ]]; then
-  echo "Built executable not found." >&2
+BUILT_EXECUTABLE="$BUILT_PRODUCTS_DIR/$APP_NAME"
+if [[ ! -f "$BUILT_EXECUTABLE" ]]; then
+  echo "Built executable not found: $BUILT_EXECUTABLE" >&2
   exit 1
 fi
 
@@ -98,26 +86,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 cp "$BUILT_EXECUTABLE" "$MACOS_DIR/$APP_NAME"
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
-SPARKLE_FRAMEWORK=""
-FRAMEWORK_CANDIDATES=()
-if [[ "$ARCH_COUNT" -gt 1 ]]; then
-  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/Sparkle.framework")
-fi
-for arch in $SWIFT_BUILD_ARCHS; do
-  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/$arch-apple-macosx/release/Sparkle.framework")
-done
-if [[ "$ARCH_COUNT" -le 1 ]]; then
-  FRAMEWORK_CANDIDATES+=("$BUILD_DIR/apple/Products/Release/Sparkle.framework")
-fi
-
-for candidate in "${FRAMEWORK_CANDIDATES[@]}"; do
-  if [[ -d "$candidate" ]]; then
-    SPARKLE_FRAMEWORK="$candidate"
-    break
-  fi
-done
-
-if [[ -z "$SPARKLE_FRAMEWORK" ]]; then
+SPARKLE_FRAMEWORK="$BUILT_PRODUCTS_DIR/Sparkle.framework"
+if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
   SPARKLE_FRAMEWORK="$(find "$BUILD_DIR/artifacts" -path "*/Sparkle.framework" -type d | sort | head -n 1)"
 fi
 

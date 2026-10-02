@@ -45,7 +45,10 @@ Sparkle updates use the same GitHub Release DMG. To republish a deleted release 
 
 - `LSUIElement` menu bar app.
 - App identifier: `co.showhere.copybara`.
-- `NSStatusItem.button` hosts a `DropTargetView` overlay for file and text drops.
+- On macOS 27, `NSStatusItem.view` hosts the drop target and icon, with item target/action support for activation.
+- On earlier versions, `NSStatusItem.button` hosts the existing `DropTargetView` overlay for file and text drops.
+- Clicking the icon opens an animated `NSPopover` anchored beneath the status item. The popover's Settings gear opens the existing options and recent-links menu beneath the button without closing its anchor. Right-clicking the status item opens the same menu.
+- The popover accepts the same drops without reaching the screen's top edge. Its application-defined behavior keeps it open when Finder becomes active, and it closes after a drop, Escape, another icon click, or the close button.
 - Dropping a Dropbox file copies a local URL, defaulting to `copybara://relative/path`.
 - The Finder service adds **Copy Link with Copybara** for Dropbox items.
 - The app opens `copybara:` links in Finder or the default app.

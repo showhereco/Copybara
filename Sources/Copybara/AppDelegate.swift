@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   )
   private var statusItem: NSStatusItem?
   private weak var statusIconView: NSImageView?
+  private let dropAreaController = DropAreaPopoverController()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
@@ -54,41 +55,75 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     button.image = nil
     button.toolTip = Constants.appName
+    button.target = self
+    button.action = #selector(showDropArea)
     button.setAccessibilityElement(false)
-    button.addSubview(statusIconView)
     self.statusIconView = statusIconView
 
     let dropTargetView = DropTargetView(frame: button.bounds)
     dropTargetView.autoresizingMask = [.width, .height]
 
     dropTargetView.onFileDrop = { [weak self] urls in
-      guard let fileURL = urls.first else {
-        return
-      }
-      self?.statusIconView?.addSymbolEffect(.rotate, options: .default, animated: true)
-      _ = self?.copyLink(forFileURL: fileURL)
+      self?.handleFileDrop(urls)
     }
     dropTargetView.onTextDrop = { [weak self] text in
       self?.handleDroppedText(text)
     }
-    dropTargetView.onMenuRequested = { [weak self] in
+    dropTargetView.onPress = { [weak self] in
+      self?.showDropArea()
+    }
+    dropTargetView.onSecondaryPress = { [weak self] in
       self?.showMenu()
     }
+    dropTargetView.setAccessibilityHelp(
+      "Opens the Copybara drop area. Right-click for options. Drop Dropbox files here to copy a link.")
 
-    button.addSubview(dropTargetView)
     statusItem = item
+
+    if #available(macOS 27.0, *) {
+      dropTargetView.preferredSize = NSSize(width: 16, height: NSStatusBar.system.thickness)
+      dropTargetView.addSubview(statusIconView)
+      item.view = dropTargetView
+      item.target = self
+      item.action = #selector(showDropArea)
+    } else {
+      button.addSubview(statusIconView)
+      button.addSubview(dropTargetView)
+    }
+
+    dropAreaController.onFileDrop = { [weak self] urls in
+      self?.handleFileDrop(urls)
+    }
+    dropAreaController.onTextDrop = { [weak self] text in
+      self?.handleDroppedText(text)
+    }
+    dropAreaController.onSettingsRequested = { [weak self] view in
+      self?.showOptionsMenu(relativeTo: view, includeDropArea: false)
+    }
   }
 
-  private func showMenu() {
-    let menu = buildMenu()
-    menu.delegate = self
+  @objc private func showMenu() {
+    dropAreaController.close()
+
+    if #available(macOS 27.0, *), let view = statusItem?.view {
+      showOptionsMenu(relativeTo: view)
+      return
+    }
 
     guard let statusItem, let button = statusItem.button else {
       return
     }
 
+    let menu = buildMenu()
+    menu.delegate = self
     statusItem.menu = menu
     button.performClick(nil)
+  }
+
+  private func showOptionsMenu(relativeTo view: NSView, includeDropArea: Bool = true) {
+    let menu = buildMenu(includeDropArea: includeDropArea)
+    menu.delegate = self
+    menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.minY), in: view)
   }
 
   func menuDidClose(_ menu: NSMenu) {
@@ -97,8 +132,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
-  private func buildMenu() -> NSMenu {
+  private func buildMenu(includeDropArea: Bool = true) -> NSMenu {
     let menu = NSMenu()
+
+    if includeDropArea {
+      menu.addItem(
+        menuItem("Show Drop Area...", action: #selector(showDropArea), icon: "square.and.arrow.down"))
+      menu.addItem(.separator())
+    }
 
     let rootTitle = preferences.dropboxRoot?.path ?? "Not set"
     let rootItem = menuItem("Dropbox: \(rootTitle)", icon: "folder")
@@ -160,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
       for link in history {
         let item = menuItem(
-          "Copy \(URL(string: link)?.lastPathComponent.removingPercentEncoding ?? link)",
+          "Copy \(historyTitle(for: link))",
           action: #selector(copyHistoryItem(_:)),
           image: historyIcon(for: link)
         )
@@ -236,6 +277,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     return menuIcon("doc")
   }
 
+  private func historyTitle(for link: String) -> String {
+    guard let url = URL(string: link),
+      let relativePath = LinkCodec.decodeRelativePath(from: url),
+      !relativePath.isEmpty
+    else {
+      return link
+    }
+
+    return (relativePath as NSString).lastPathComponent
+  }
+
   private func sizedMenuIcon(_ image: NSImage) -> NSImage {
     image.size = NSSize(width: 16, height: 16)
     return image
@@ -243,6 +295,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
   @objc private func checkForUpdates() {
     updaterController.checkForUpdates(nil)
+  }
+
+  @objc private func showDropArea() {
+    Task { @MainActor [weak self] in
+      guard let self, let statusItem else {
+        return
+      }
+
+      if #available(macOS 27.0, *), let view = statusItem.view {
+        dropAreaController.show(relativeTo: view)
+      } else if let button = statusItem.button {
+        dropAreaController.show(relativeTo: button)
+      }
+    }
+  }
+
+  private func handleFileDrop(_ urls: [URL]) {
+    guard let fileURL = urls.first else {
+      return
+    }
+    statusIconView?.addSymbolEffect(.rotate, options: .default, animated: true)
+    _ = copyLink(forFileURL: fileURL)
   }
 
   private func handleDroppedText(_ text: String) {
@@ -407,6 +481,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func flashStatusButton() {
+    if #available(macOS 27.0, *), let view = statusItem?.view as? DropTargetView {
+      view.flash()
+      return
+    }
+
     guard let button = statusItem?.button else {
       return
     }
