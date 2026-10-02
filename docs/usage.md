@@ -15,10 +15,19 @@ Copybara links are local path links. They work best when everyone has access to 
 There are three ways to copy a Copybara link:
 
 1. Drag a file or folder from Dropbox onto the Copybara icon in the menu bar.
-2. Right-click a Dropbox item in Finder and choose **Copy Link with Copybara**.
+2. Right-click a Dropbox item in Finder and choose **Services → Copy Link with Copybara**.
 3. Click the Copybara icon to expand its drop area, then drag a Dropbox file or folder onto it.
 
 Copybara writes a `copybara:` link to the clipboard and keeps recent copied links in the menu for quick reuse.
+
+## Enable the Finder Service Manually
+
+If **Copy Link with Copybara** is missing from Finder’s **Services** menu:
+
+1. Make sure **Copybara.app** is in **Applications**, then open it.
+2. Open **System Settings → Keyboard → Keyboard Shortcuts…**.
+3. Select **Services**, expand **Files and Folders**, and tick **Copy Link with Copybara**.
+4. Click **Done**. In Finder, right-click a Dropbox file or folder and choose **Services → Copy Link with Copybara**.
 
 ## Open a Link
 
@@ -52,6 +61,8 @@ Click the Settings gear in the drop area to open the options menu, including rec
 - **Quit** closes Copybara.
 
 ## Troubleshooting
+
+If **Copy Link with Copybara** is missing from Finder’s **Services** menu, follow [Enable the Finder Service Manually](#enable-the-finder-service-manually).
 
 If macOS 27 opens Mission Control when you drag toward the menu bar, click the Copybara icon before starting the drag and drop onto the area that expands beneath it. You can also use **Copy Link with Copybara** in Finder.
 

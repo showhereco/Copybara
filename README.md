@@ -34,7 +34,7 @@ The app appears as a link icon in the macOS menu bar. On first launch, Copybara 
 3. Drag a Dropbox file or folder onto the Copybara menu bar icon.
 4. Paste the copied `copybara:` link wherever you want to share it.
 
-Click the Copybara icon to expand an attached drop area beneath it. The Settings gear opens options and recent links; you can also right-click the icon for this menu. In Finder, right-click a Dropbox item and choose **Copy Link with Copybara**.
+Click the Copybara icon to expand an attached drop area beneath it. The Settings gear opens options and recent links; you can also right-click the icon for this menu. In Finder, right-click a Dropbox item and choose **Services → Copy Link with Copybara**.
 
 See [Using Copybara](docs/usage.md) for menu options, link behavior, and troubleshooting.
 
