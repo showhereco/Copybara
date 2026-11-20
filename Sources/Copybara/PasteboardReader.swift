@@ -1,6 +1,9 @@
 import AppKit
 
 enum PasteboardReader {
+  private static let filenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+  static let dropTypes: [NSPasteboard.PasteboardType] = [.fileURL, filenamesType, .URL, .string]
+
   static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
     let options: [NSPasteboard.ReadingOptionKey: Any] = [
       .urlReadingFileURLsOnly: true
@@ -18,7 +21,6 @@ enum PasteboardReader {
       return urls
     }
 
-    let filenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
     let filenames = pasteboard.propertyList(forType: filenamesType) as? [String]
     return filenames?.map { URL(fileURLWithPath: $0) } ?? []
   }

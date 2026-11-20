@@ -16,7 +16,7 @@ There are three ways to copy a Copybara link:
 
 1. Drag a file or folder from Dropbox onto the Copybara icon in the menu bar.
 2. Right-click a Dropbox item in Finder and choose **Services → Copy Link with Copybara**.
-3. Click the Copybara icon to expand its drop area, then drag a Dropbox file or folder onto it.
+3. Open **Show Drop Area...** from the Copybara menu, then drag a Dropbox file or folder onto the area beneath the icon.
 
 Copybara writes a `copybara:` link to the clipboard and keeps recent copied links in the menu for quick reuse.
 
@@ -47,9 +47,9 @@ This uses Spotlight, so results depend on the local Spotlight index and may be a
 
 ## Menu Options
 
-Click the Settings gear in the drop area to open the options menu, including recent links. You can also right-click the Copybara icon for the same menu.
+Click the Copybara icon to open the options menu, including recent links. On Golden Gate releases before macOS 27.2, clicking opens the drop area. Right-click the icon or click the Settings gear in the drop area to open the menu on any supported version.
 
-- **Show Drop Area...** opens a drop target attached beneath the Copybara icon. It stays open while you switch to Finder and closes after a drop. Use Escape, the close button, or click the icon again to dismiss it.
+- **Show Drop Area...** opens a drop target attached beneath the Copybara icon. It stays open while you switch to Finder and closes after a drop. Use Escape or the close button to dismiss it.
 - **Dropbox:** shows the currently configured Dropbox folder.
 - **Change Dropbox Folder...** chooses a different Dropbox folder.
 - **Copied URL scheme** switches between `copybara:` and legacy `dropifier:` links.
@@ -64,7 +64,7 @@ Click the Settings gear in the drop area to open the options menu, including rec
 
 If **Copy Link with Copybara** is missing from Finder’s **Services** menu, follow [Enable the Finder Service Manually](#enable-the-finder-service-manually).
 
-If macOS 27 opens Mission Control when you drag toward the menu bar, click the Copybara icon before starting the drag and drop onto the area that expands beneath it. You can also use **Copy Link with Copybara** in Finder.
+If Mission Control opens when you drag toward the menu bar, use **Show Drop Area...** before starting the drag, then drop onto the area beneath the icon. On Golden Gate releases before macOS 27.2, a click on the icon opens the drop area directly. You can also use **Copy Link with Copybara** in Finder.
 
 If Copybara says your Dropbox folder is not set, open the menu and choose **Change Dropbox Folder...**.
 

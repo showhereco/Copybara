@@ -45,9 +45,11 @@ Sparkle updates use the same GitHub Release DMG. To republish a deleted release 
 
 - `LSUIElement` menu bar app.
 - App identifier: `co.showhere.copybara`.
-- On macOS 27, `NSStatusItem.view` hosts the drop target and icon, with item target/action support for activation.
-- On earlier versions, `NSStatusItem.button` hosts the existing `DropTargetView` overlay for file and text drops.
-- Clicking the icon opens an animated `NSPopover` anchored beneath the status item. The popover's Settings gear opens the existing options and recent-links menu beneath the button without closing its anchor. Right-clicking the status item opens the same menu.
+- On macOS 27.0 through the releases before 27.2, `NSStatusItem.view` hosts the drop target and icon, with item target/action support for activation.
+- On earlier versions and on macOS 27.2 or later, `NSStatusItem.button` hosts the `DropTargetView` overlay for file and text drops.
+- On macOS 27 releases before 27.2, a primary click opens the drop popover. On other releases, it opens the menu. Right-clicking always opens the menu, and **Show Drop Area...** opens the popover from that menu.
+- MacGeneration observed that file drops onto menu bar icons worked again without triggering Mission Control on macOS 27.2, which Apple released on 26 October 2026. [MacGeneration’s test](https://www.macg.co/macos/2026/11/macos-272-remet-mission-control-daplomb-312105) · [Apple’s release date](https://support.apple.com/en-us/149521)
+- The animated `NSPopover` is anchored beneath the status item. Its Settings gear opens the options and recent-links menu beneath the button without closing the popover.
 - The popover accepts the same drops without reaching the screen's top edge. Its application-defined behavior keeps it open when Finder becomes active, and it closes after a drop, Escape, another icon click, or the close button.
 - Dropping a Dropbox file copies a local URL, defaulting to `copybara://relative/path`.
 - The Finder service adds **Copy Link with Copybara** for Dropbox items.

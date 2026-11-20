@@ -78,7 +78,7 @@ final class DropTargetView: NSView {
   }
 
   override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-    guard canRead(sender.draggingPasteboard) else {
+    guard sender.draggingPasteboard.availableType(from: PasteboardReader.dropTypes) != nil else {
       return []
     }
     isHighlighted = true
@@ -111,13 +111,8 @@ final class DropTargetView: NSView {
     return false
   }
 
-  private func canRead(_ pasteboard: NSPasteboard) -> Bool {
-    !PasteboardReader.fileURLs(from: pasteboard).isEmpty
-      || PasteboardReader.text(from: pasteboard) != nil
-  }
-
   private func configure() {
-    registerForDraggedTypes([.fileURL, .URL, .string])
+    registerForDraggedTypes(PasteboardReader.dropTypes)
     toolTip = Constants.appName
     setAccessibilityElement(true)
     setAccessibilityRole(.button)

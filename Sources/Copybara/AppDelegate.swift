@@ -14,7 +14,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   )
   private var statusItem: NSStatusItem?
   private weak var statusIconView: NSImageView?
+  private weak var statusDropTargetView: DropTargetView?
   private let dropAreaController = DropAreaPopoverController()
+
+  private var opensDropAreaByDefault: Bool {
+    let version = ProcessInfo.processInfo.operatingSystemVersion
+    return version.majorVersion == 27 && version.minorVersion < 2
+  }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
@@ -56,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     button.image = nil
     button.toolTip = Constants.appName
     button.target = self
-    button.action = #selector(showDropArea)
+    button.action = #selector(activateStatusItem)
     button.setAccessibilityElement(false)
     self.statusIconView = statusIconView
 
@@ -70,22 +76,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       self?.handleDroppedText(text)
     }
     dropTargetView.onPress = { [weak self] in
-      self?.showDropArea()
+      self?.activateStatusItem()
     }
     dropTargetView.onSecondaryPress = { [weak self] in
       self?.showMenu()
     }
     dropTargetView.setAccessibilityHelp(
-      "Opens the Copybara drop area. Right-click for options. Drop Dropbox files here to copy a link.")
+      opensDropAreaByDefault
+        ? "Opens the Copybara drop area. Right-click for options."
+        : "Opens the Copybara menu. Drop Dropbox files here to copy a link.")
 
     statusItem = item
+    statusDropTargetView = dropTargetView
 
-    if #available(macOS 27.0, *) {
+    if opensDropAreaByDefault {
       dropTargetView.preferredSize = NSSize(width: 16, height: NSStatusBar.system.thickness)
       dropTargetView.addSubview(statusIconView)
       item.view = dropTargetView
       item.target = self
-      item.action = #selector(showDropArea)
+      item.action = #selector(activateStatusItem)
     } else {
       button.addSubview(statusIconView)
       button.addSubview(dropTargetView)
@@ -102,10 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
   }
 
+  @objc private func activateStatusItem() {
+    if opensDropAreaByDefault {
+      showDropArea()
+    } else {
+      showMenu()
+    }
+  }
+
   @objc private func showMenu() {
     dropAreaController.close()
 
-    if #available(macOS 27.0, *), let view = statusItem?.view {
+    if #available(macOS 27.0, *), let view = statusDropTargetView {
       showOptionsMenu(relativeTo: view)
       return
     }
@@ -303,7 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return
       }
 
-      if #available(macOS 27.0, *), let view = statusItem.view {
+      if #available(macOS 27.0, *), let view = statusDropTargetView {
         dropAreaController.show(relativeTo: view)
       } else if let button = statusItem.button {
         dropAreaController.show(relativeTo: button)
@@ -481,7 +498,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private func flashStatusButton() {
-    if #available(macOS 27.0, *), let view = statusItem?.view as? DropTargetView {
+    if #available(macOS 27.0, *), let view = statusDropTargetView {
       view.flash()
       return
     }
